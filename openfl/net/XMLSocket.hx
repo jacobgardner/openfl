@@ -61,8 +61,7 @@ class XMLSocket extends EventDispatcher {
 	
 	public function send (object:Dynamic):Void {
 		
-		__socket.writeUTFBytes (Std.string (object));
-		__socket.writeByte (0);
+		__socket.writeObject (object);
 		__socket.flush ();
 		
 	}

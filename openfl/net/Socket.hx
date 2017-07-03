@@ -52,6 +52,7 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	private var __timestamp:Float;
 	
 	#if html5
+	private var __jsObject:Dynamic;
 	private var __socket:JSSocket;
 	private var __socketID:String;
 	#elseif sys
@@ -184,14 +185,23 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 			
 		}
 		
-		if (__output.length > 0) {
+		if (__output.length > 0 #if html5 || __jsObject != null #end) {
 			
 			try {
 				
 				#if (js && html5)
-				var buffer:ArrayBuffer = __output;
-				if (buffer.byteLength > __output.length) buffer = buffer.slice (0, __output.length);
-				__socket.emit (__socketID, buffer);
+				if (__jsObject != null) {
+					
+					__socket.emit (__socketID, __jsObject);
+					__jsObject = null;
+					
+				} else {
+					
+					var buffer:ArrayBuffer = __output;
+					if (buffer.byteLength > __output.length) buffer = buffer.slice (0, __output.length);
+					__socket.emit (__socketID, buffer);
+					
+				}
 				#else
 				__socket.output.writeBytes (__output, 0, __output.length);
 				#end
@@ -475,11 +485,19 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	}
 	
 	
-	//public function writeObject (object:Dynamic):Void {
-		//
+	@:noCompletion public function writeObject (object:Dynamic):Void {
+		
+		// not-compliant
+		
+		#if sys
+		__output.writeUTFBytes (Std.string (object));
+		__output.writeByte (0);
 		//__output.writeObject (object);
-		//
-	//}
+		#else
+		__jsObject = object;
+		#end
+		
+	}
 	
 	
 	public function writeShort (value:Int):Void {
