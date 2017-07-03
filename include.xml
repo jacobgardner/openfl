@@ -76,6 +76,8 @@
 			<haxedef name="openfl-html5" />
 			<haxeflag name="--remap" value="flash:openfl" />
 			
+			<dependency path="dependencies/socket.io.slim.js" />
+			
 			<module name="openfl" if="modular">
 				
 				<source path="" package="openfl" exclude="openfl._internal.renderer.console.*|*.GLGraphics|*.SWFLibrary" />

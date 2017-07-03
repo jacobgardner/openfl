@@ -19,6 +19,7 @@ import openfl.Lib;
 
 #if (js && html5)
 import js.html.ArrayBuffer;
+import js.Browser;
 #end
 
 #if sys
@@ -29,6 +30,8 @@ import sys.net.Socket in SysSocket;
 
 class Socket extends EventDispatcher implements IDataInput implements IDataOutput {
 	
+	
+	private static var __nextID = 0;
 	
 	public var bytesAvailable (get, never):Int;
 	public var bytesPending (get, never):Int;
@@ -46,8 +49,16 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	private var __inputBuffer:ByteArray;
 	private var __output:ByteArray;
 	private var __port:Int;
-	private var __socket:#if sys SysSocket #else Dynamic #end;
 	private var __timestamp:Float;
+	
+	#if html5
+	private var __socket:JSSocket;
+	private var __socketID:String;
+	#elseif sys
+	private var __socket:SysSocket;
+	#else
+	private var __socket:Dynamic;
+	#end
 	
 	
 	public function new (host:String = null, port:Int = 0) {
@@ -82,11 +93,7 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 			
 		}
 		
-		#if (js && html5)
-		
-		__timestamp = Timer.stamp ();
-		
-		#else
+		#if sys
 		
 		var h:Host = null;
 		
@@ -114,28 +121,28 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 		__input = new ByteArray ();
 		__input.endian = __endian;
 		
-		#if (js && html5)
+		#if html5
+		
 		__inputBuffer = new ByteArray ();
 		__inputBuffer.endian = __endian;
-		#end
 		
-		#if (js && html5)
+		var protocol = "http:";
 		
-		var schema = secure ? "wss" : "ws";
-		var urlReg = ~/^(.*:\/\/)?([A-Za-z0-9\-\.]+)\/?(.*)/g;
-		urlReg.match (host);
-		var __webHost = urlReg.matched (2);
-		var __webPath = urlReg.matched (3);
+		if (secure || Browser.location.protocol == 'https:') {
+			
+			protocol = "https:";
+			
+		}
 		
-		__socket = untyped __js__("new WebSocket(schema + \"://\" + __webHost + \":\" + port + \"/\" + __webPath)");
+		__socketID = "openfl" + (__nextID++);
+		__socket = SocketIO.connect (protocol + "//" + host + ":" + port, { timeout: timeout });
+		__socket.on ("connect", socket_onConnect);
+		__socket.on ("connect_error", socket_onConnectError);
+		__socket.on ("connect_timeout", socket_onConnectTimeout);
+		__socket.on ("disconnect", socket_onDisconnect);
+		__socket.on (__socketID, socket_onMessage);
 		
-		__socket.onopen = socket_onOpen;
-		__socket.onmessage = socket_onMessage;
-		__socket.onclose = socket_onClose;
-		__socket.onerror = socket_onError;
-		__socket.binaryType = "arraybuffer";
-		
-		#else
+		#elseif sys
 		
 		__socket = new SysSocket ();
 		__socket.setBlocking (false);
@@ -171,20 +178,20 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	
 	public function flush ():Void {
 		
-		if ( __socket == null) {
+		if (__socket == null) {
 			
 			throw new IOError ("Operation attempted on invalid socket.");
 			
 		}
 		
-		if ( __output.length > 0) {
+		if (__output.length > 0) {
 			
 			try {
 				
 				#if (js && html5)
 				var buffer:ArrayBuffer = __output;
 				if (buffer.byteLength > __output.length) buffer = buffer.slice (0, __output.length);
-				__socket.send (buffer);
+				__socket.emit (__socketID, buffer);
 				#else
 				__socket.output.writeBytes (__output, 0, __output.length);
 				#end
@@ -527,18 +534,23 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	}
 	
 	
-	
 	private function __cleanSocket ():Void {
 		
-		try {
+		if (__socket != null) {
 			
-			__socket.close ();
+			#if sys
+			try {
+				
+				__socket.close ();
+				
+			} catch (e:Dynamic) {}
+			#end
 			
-		} catch (e:Dynamic) {}
-
-		__socket = null;
-		__connected = false;
-		Lib.current.removeEventListener (Event.ENTER_FRAME, this_onEnterFrame);
+			__socket = null;
+			__connected = false;
+			Lib.current.removeEventListener (Event.ENTER_FRAME, this_onEnterFrame);
+			
+		}
 		
 	}
 	
@@ -550,42 +562,7 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	
 	
 	
-	private function socket_onClose (_):Void {
-		
-		dispatchEvent (new Event (Event.CLOSE));
-		
-	}
-	
-	
-	private function socket_onError (_):Void {
-		
-		dispatchEvent (new Event (IOErrorEvent.IO_ERROR));
-		
-	}
-	
-	
-	private function socket_onMessage (msg:Dynamic):Void {
-		
-		#if (js && html5)
-		if (Std.is (msg.data, String)) {
-
-			__inputBuffer.position = __inputBuffer.length;
-			var cachePosition = __inputBuffer.position;
-			__inputBuffer.writeUTFBytes (msg.data);
-			__inputBuffer.position = cachePosition;
-			
-		} else {
-			
-			var newData:ByteArray = (msg.data:ArrayBuffer);
-			newData.readBytes (__inputBuffer, __inputBuffer.length);
-			
-		}
-		#end
-		
-	}
-	
-	
-	private function socket_onOpen (_):Void {
+	private function socket_onConnect (_):Void {
 		
 		__connected = true;
 		dispatchEvent (new Event (Event.CONNECT));
@@ -593,9 +570,48 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	}
 	
 	
+	private function socket_onConnectError (_):Void {
+		
+		__cleanSocket ();
+		dispatchEvent (new IOErrorEvent (IOErrorEvent.IO_ERROR, true, false, "Connection failed"));
+		
+	}
+	
+	
+	private function socket_onConnectTimeout (_):Void {
+		
+		socket_onDisconnect (_);
+		
+	}
+	
+	
+	private function socket_onDisconnect (_):Void {
+		
+		__cleanSocket ();
+		dispatchEvent (new Event (Event.CLOSE));
+		
+	}
+	
+	
+	private function socket_onError (_):Void {
+		
+		__cleanSocket ();
+		dispatchEvent (new Event (IOErrorEvent.IO_ERROR));
+		
+	}
+	
+	
+	private function socket_onMessage (data:ArrayBuffer):Void {
+		
+		var newData:ByteArray = data;
+		newData.readBytes (__inputBuffer, __inputBuffer.length);
+		
+	}
+	
+	
 	private function this_onEnterFrame (event:Event):Void {
 		
-		#if (js && html5)
+		#if html5
 		
 		if (__inputBuffer.bytesAvailable > 0) {
 			
@@ -783,3 +799,22 @@ class Socket extends EventDispatcher implements IDataInput implements IDataOutpu
 	
 	
 }
+
+
+#if html5
+@:native("io") extern class SocketIO {
+	
+	@:selfCall
+	public function new ():Void;
+	public static function connect (url:String, ?options:Dynamic):JSSocket;
+	
+}
+
+extern class JSSocket {
+	
+	public function disconnect():Void;
+	public function on (event:String, ?callback:Dynamic):Void;
+	public function emit (event:String, ?data:Dynamic):Void;
+	
+}
+#end

@@ -39,6 +39,8 @@ import openfl.Lib;
 				functionName += '.bind(${thisArg})';
 			}
 		}
+		
+		try {
 
 		// Flash does not throw an error or attempt to execute
 		// if the function does not exist.
@@ -89,6 +91,7 @@ import openfl.Lib;
 		return null;
 		#end
 		
+	} catch (e:Dynamic) { return null; }
 	}
 	
 	
