@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: haxe:3.4
+      - image: circleci/node:latest
     steps:
       - checkout
       - run: echo "Hello World!"
