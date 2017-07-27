@@ -12,8 +12,6 @@ jobs:
      - run: if [[ $CIRCLE_BRANCH == 'master' ]]; then git clone -b master --single-branch --recursive https://github.com/openfl/lime ~/lime --depth 1 > log.txt || cat log.txt ; fi
      - run: if [[ $CIRCLE_BRANCH != 'master' ]]; then git clone -b develop --single-branch --recursive https://github.com/openfl/lime ~/lime --depth 1 > log.txt || cat log.txt ; fi
      - run: haxelib dev lime ~/lime
-     - run: haxelib install compiletime
-     - run: haxelib install hxcpp > log.txt || cat log.txt
      - run: if [[ $HAXE_VERSION != 'development' ]]; then yes | haxelib install hxcpp > log.txt || cat log.txt ; fi
      - run: if [[ $HAXE_VERSION == 'development' ]]; then git clone https://github.com/haxefoundation/hxcpp ~/hxcpp --depth 1 > log.txt || cat log.txt ; fi
      - run: if [[ $HAXE_VERSION == 'development' ]]; then haxelib dev hxcpp ~/hxcpp ; fi
@@ -24,22 +22,26 @@ jobs:
      - run: yes | haxelib install hamcrest > log.txt || cat log.txt
      - run: git clone https://github.com/jgranick/MassiveUnit ~/munit --depth 1 > log.txt || cat log.txt
      - run: haxelib dev munit ~/munit/src
-     - run: cd ~/munit/tool
-     - run: haxe build.hxml
+     - run:
+         working_directory: ~/munit/tool
+         command: haxe build.hxml
      - run: haxelib run lime rebuild linux -release -64 -nocffi > log.txt || cat log.txt
      - run: haxelib run lime rebuild tools -nocffi
-     - run: cd ~/openfl/tests/unit
-     - run: haxelib run munit gen
+     - run:
+         working_directory: ~/openfl/tests/unit
+         command: haxelib run munit gen
   
   flash:
     docker:
      - image: haxe:3.4
+    working_directory: ~/openfl/tests/unit
     steps:
      - run: haxelib run munit test -as3 -norun -nocffi
   
   neko:
     docker:
      - image: haxe:3.4
+    working_directory: ~/openfl/tests/unit
     steps:
      - run: haxelib run lime build neko -nocffi
      - run: haxelib run lime build neko -Ddisable-cffi -nocffi
@@ -47,18 +49,21 @@ jobs:
   html5:
     docker:
      - image: haxe:3.4
+    working_directory: ~/openfl/tests/unit
     steps:
      - run: haxelib run munit test -browser phantomjs -nocffi
   
   cpp:
     docker:
      - image: haxe:3.4
+    working_directory: ~/openfl/tests/unit
     steps:
      - run: haxelib run lime test linux --window-hardware=false
   
   docs:
     docker:
      - image: haxe:3.4
+    working_directory: ~/openfl/tests/unit
     steps:
      - run: git clone https://github.com/openfl/dox ~/dox --depth 1 > log.txt || cat log.txt
      - run: haxelib dev dox ~/dox
