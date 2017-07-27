@@ -1,5 +1,6 @@
 version: 2
 jobs:
+
   setup:
     docker:
      - image: haxe:3.4
@@ -29,31 +30,57 @@ jobs:
      - run: haxelib run lime rebuild tools -nocffi
      - run: cd ~/openfl/tests/unit
      - run: haxelib run munit gen
+  
   flash:
-    requires:
-     - setup
+    docker:
+     - image: haxe:3.4
     steps:
-     - run: haxelib run munit test -as3 -norun -nocffi 
+     - run: haxelib run munit test -as3 -norun -nocffi
+  
   neko:
-    requires:
-     - setup
+    docker:
+     - image: haxe:3.4
     steps:
      - run: haxelib run lime build neko -nocffi
      - run: haxelib run lime build neko -Ddisable-cffi -nocffi
+  
   html5:
-    requires:
-     - setup
+    docker:
+     - image: haxe:3.4
     steps:
      - run: haxelib run munit test -browser phantomjs -nocffi
+  
   cpp:
-    requires:
-     - setup
+    docker:
+     - image: haxe:3.4
     steps:
      - run: haxelib run lime test linux --window-hardware=false
+  
   docs:
-    requires:
-     - setup
+    docker:
+     - image: haxe:3.4
     steps:
      - run: git clone https://github.com/openfl/dox ~/dox --depth 1 > log.txt || cat log.txt
      - run: haxelib dev dox ~/dox
      - run: cd ~/openfl/docs && haxe build.hxml
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - setup
+      - flash:
+          requires:
+           - setup
+      - neko:
+          requires:
+           - setup
+      - html5:
+          requires:
+           - setup
+      - cpp:
+          requires:
+           - setup
+      - docs:
+          requires:
+           - setup
