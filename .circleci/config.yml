@@ -12,8 +12,8 @@ jobs:
      - run: if [[ $CIRCLE_BRANCH == 'master' ]]; then git clone -b master --single-branch --recursive https://github.com/openfl/lime ~/lime --depth 1 > log.txt || cat log.txt ; fi
      - run: if [[ $CIRCLE_BRANCH != 'master' ]]; then git clone -b develop --single-branch --recursive https://github.com/openfl/lime ~/lime --depth 1 > log.txt || cat log.txt ; fi
      - run: haxelib dev lime ~/lime
-     - run: yes | haxelib install compiletime
-     - run: yes | haxelib install hxcpp > log.txt || cat log.txt
+     - run: haxelib install compiletime
+     - run: haxelib install hxcpp > log.txt || cat log.txt
      - run: if [[ $HAXE_VERSION != 'development' ]]; then yes | haxelib install hxcpp > log.txt || cat log.txt ; fi
      - run: if [[ $HAXE_VERSION == 'development' ]]; then git clone https://github.com/haxefoundation/hxcpp ~/hxcpp --depth 1 > log.txt || cat log.txt ; fi
      - run: if [[ $HAXE_VERSION == 'development' ]]; then haxelib dev hxcpp ~/hxcpp ; fi
